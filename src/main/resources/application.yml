@@ -1,5 +1,41 @@
+server:
+  port: 8080 # 后端服务端口
+
 spring:
+  application:
+    name: final-year-proj
+  redis:
+    host: 192.168.80.100
+    port: 6379
+    password: 3838438QQq
+    database: 0
+    timeout: 5000ms
+
+  # 1. 数据库配置 [cite: 4, 112]
   datasource:
-    url: jdbc:mysql://192.168.80.100:3306/your_db?useSSL=false&serverTimezone=Asia/Shanghai
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # 替换为你虚拟机的 IP: 192.168.80.100
+    url: jdbc:mysql://192.168.80.100:3306/final_year_proj?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
     username: root
     password: 3838438QQqq!
+
+  # 3. 文件上传限制 (为 3.3 节 File Upload 做准备) [cite: 43, 63]
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+# 4. MyBatis-Plus 配置 [cite: 3, 114]
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.raincheck.finalyearproj.entity
+
+# 5. 自定义 Security 属性 (为 3.1 节 JWT 做准备) [cite: 41, 43]
+jwt:
+  header: Authorization
+  secret: my_very_secure_random_string_here_for_fyp_project
+  expiration: 604800 # Token 有效期 (7天)
+
+logging:
+  level:
+    com.raincheck.finalyearproj: debug
