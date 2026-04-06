@@ -1,0 +1,14 @@
+ssh -L 6379:localhost:6379 root@192.168.80.101
+
+
+
+microservice nacos 密钥
+VGhpc0lzTXlDdXN0b21TZWNyZXRLZXkwMTIzNDU2Nzg=
+
+minio:
+
+[root@localhost opt]# nohup ./minio server --address "192.168.231.136:9000" /data > minio.log 2>&1 &
+
+
+[root@localhost opt]# export MINIO_ACCESS_KEY=minioadmin
+[root@localhost opt]# export MINIO_SECRET_KEY=minioadmin
