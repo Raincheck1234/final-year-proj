@@ -1,0 +1,1693 @@
+Project Path: final-year-proj
+
+Source Tree:
+
+```txt
+final-year-proj
+└── src
+    ├── main
+    │   └── java
+    │       └── com
+    │           └── raincheck
+    │               └── finalyearproj
+    │                   ├── FinalYearProjApplication.java
+    │                   ├── common
+    │                   │   ├── Result.java
+    │                   │   └── UserContext.java
+    │                   ├── config
+    │                   │   ├── JwtConfig.java
+    │                   │   ├── RestTemplateConfig.java
+    │                   │   ├── WebConfig.java
+    │                   │   ├── WebMvcConfig.java
+    │                   │   └── WebSocketConfig.java
+    │                   ├── controller
+    │                   │   ├── AuthController.java
+    │                   │   ├── ChatController.java
+    │                   │   ├── StudentProjectController.java
+    │                   │   └── SupervisorProjectController.java
+    │                   ├── handler
+    │                   │   └── GlobalExceptionHandler.java
+    │                   ├── interceptor
+    │                   │   └── JwtInterceptor.java
+    │                   ├── mapper
+    │                   │   ├── ChatMessageMapper.java
+    │                   │   ├── ProjectMapper.java
+    │                   │   ├── UploadedFileMapper.java
+    │                   │   ├── UserMapper.java
+    │                   │   └── VersionLogMapper.java
+    │                   ├── model
+    │                   │   ├── dto
+    │                   │   │   ├── LoginDataDTO.java
+    │                   │   │   └── PasswordUpdateDTO.java
+    │                   │   ├── entity
+    │                   │   │   ├── ChatMessage.java
+    │                   │   │   ├── Project.java
+    │                   │   │   ├── UploadedFile.java
+    │                   │   │   ├── User.java
+    │                   │   │   └── VersionLog.java
+    │                   │   └── vo
+    │                   │       └── ProjectVO.java
+    │                   ├── service
+    │                   │   ├── ChatMessageService.java
+    │                   │   ├── ProjectService.java
+    │                   │   ├── UserService.java
+    │                   │   ├── VersionLogService.java
+    │                   │   └── impl
+    │                   │       ├── ChatMessageServiceImpl.java
+    │                   │       ├── ProjectServiceImpl.java
+    │                   │       ├── UserServiceImpl.java
+    │                   │       └── VersionLogServiceImpl.java
+    │                   ├── utils
+    │                   │   └── JwtUtils.java
+    │                   └── websocket
+    │                       ├── ChatHandshakeInterceptor.java
+    │                       └── ChatWebSocketHandler.java
+    └── test
+        └── java
+            └── com
+                └── raincheck
+                    └── finalyearproj
+                        ├── FinalYearProjApplicationTests.java
+                        ├── ProjectServiceTest.java
+                        └── Security
+                            └── AuthTest.java
+
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\FinalYearProjApplication.java`:
+
+```java
+package com.raincheck.finalyearproj;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class FinalYearProjApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(FinalYearProjApplication.class, args);
+    }
+
+}
+
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\common\Result.java`:
+
+```java
+package com.raincheck.finalyearproj.common;
+
+import lombok.Data;
+
+@Data
+public class Result<T> {
+    private Integer code;
+    private String msg;
+    private T data;
+
+    public static <T> Result<T> success(T data) {
+        Result<T> result = new Result<>();
+        result.setCode(200);
+        result.setMsg("Success");
+        result.setData(data);
+        return result;
+    }
+
+    public static <T> Result<T> error(Integer code, String msg) {
+        Result<T> result = new Result<>();
+        result.setCode(code);
+        result.setMsg(msg);
+        return result;
+    }
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\common\UserContext.java`:
+
+```java
+package com.raincheck.finalyearproj.common;
+
+import lombok.Builder;
+import lombok.Data;
+
+public class UserContext {
+    private static final ThreadLocal<UserDTO> USER_HOLDER = new ThreadLocal<>();
+
+    @Data
+    @Builder
+    public static class UserDTO {
+        private Integer userId;
+        private String email;
+        private String role;
+    }
+
+    public static void setUser(UserDTO user) {
+        USER_HOLDER.set(user);
+    }
+
+    public static UserDTO getUser() {
+        return USER_HOLDER.get();
+    }
+
+    // 快捷获取属性的方法
+    public static Integer getUserId() {
+        return getUser() != null ? getUser().getUserId() : null;
+    }
+
+    public static String getRole() {
+        return getUser() != null ? getUser().getRole() : null;
+    }
+
+    public static void removeUser() {
+        USER_HOLDER.remove();
+    }
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\config\JwtConfig.java`:
+
+```java
+package com.raincheck.finalyearproj.config;
+
+import lombok.Data;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+
+@Data
+@Configuration
+@ConfigurationProperties(prefix = "jwt") // 对应 yml 中的 jwt 前缀
+public class JwtConfig {
+    private String header;
+    private String secret;
+    private Long expiration;
+
+    @Bean
+    public BCryptPasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\config\RestTemplateConfig.java`:
+
+```java
+package com.raincheck.finalyearproj.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestTemplate;
+
+@Configuration
+public class RestTemplateConfig {
+    @Bean
+    public RestTemplate restTemplate() {
+        return new RestTemplate();
+    }
+}
+
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\config\WebConfig.java`:
+
+```java
+package com.raincheck.finalyearproj.config;
+
+import com.raincheck.finalyearproj.interceptor.JwtInterceptor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+
+    @Autowired
+    private JwtInterceptor jwtInterceptor;
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(jwtInterceptor)
+                .addPathPatterns("/api/**")        // 拦截所有 API
+                .excludePathPatterns("/api/auth/**") // 放行注册登录
+                .excludePathPatterns("/swagger-ui/**", "/v3/api-docs/**"); // 放行 Swagger
+    }
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\config\WebMvcConfig.java`:
+
+```java
+package com.raincheck.finalyearproj.config;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+@Configuration
+public class WebMvcConfig implements WebMvcConfigurer {
+
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        // 设置允许跨域的路径
+        registry.addMapping("/**")
+                // 设置允许跨域请求的域名 (Electron 开发环境通常是 http://localhost:5173 或类似)
+                // 使用 allowedOriginPatterns("*") 允许所有来源，适合开发阶段
+                .allowedOriginPatterns("*")
+                // 是否允许证书 (Cookies)
+                .allowCredentials(true)
+                // 设置允许的方法
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                // 设置允许的 Header
+                .allowedHeaders("*")
+                // 跨域允许时间
+                .maxAge(3600);
+    }
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\config\WebSocketConfig.java`:
+
+```java
+package com.raincheck.finalyearproj.config;
+
+import com.raincheck.finalyearproj.websocket.ChatHandshakeInterceptor;
+import com.raincheck.finalyearproj.websocket.ChatWebSocketHandler;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.socket.config.annotation.EnableWebSocket;
+import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
+import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
+
+@Configuration
+@EnableWebSocket
+public class WebSocketConfig implements WebSocketConfigurer {
+
+    @Autowired
+    private ChatWebSocketHandler chatWebSocketHandler;
+
+    @Autowired
+    private ChatHandshakeInterceptor chatHandshakeInterceptor;
+
+    @Override
+    public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+        registry.addHandler(chatWebSocketHandler, "/ws/chat")
+                .setAllowedOrigins("*") // 允许跨域（解决 Electron 调用问题）
+                .addInterceptors(chatHandshakeInterceptor);
+    }
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\controller\AuthController.java`:
+
+```java
+package com.raincheck.finalyearproj.controller;
+
+import com.raincheck.finalyearproj.common.Result;
+import com.raincheck.finalyearproj.common.UserContext;
+import com.raincheck.finalyearproj.model.dto.LoginDataDTO;
+import com.raincheck.finalyearproj.model.dto.PasswordUpdateDTO;
+import com.raincheck.finalyearproj.model.entity.User;
+import com.raincheck.finalyearproj.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/auth")
+public class AuthController {
+
+    @Autowired
+    private UserService userService;
+
+    @PostMapping("/register")
+    public Result<String> register(@RequestBody User user) {
+        return Result.success(userService.register(user));
+    }
+
+    @PostMapping("/login")
+    public Result<String> login(@RequestBody LoginDataDTO loginData) {
+        String token = userService.login(loginData.getEmail(), loginData.getPassword());
+        return Result.success(token);
+    }
+
+    @PostMapping("/update-password")
+    public Result<String> updatePassword(@RequestBody PasswordUpdateDTO dto){
+        UserContext.UserDTO userDTO = UserContext.getUser();
+        userService.updatePassword(userDTO.getEmail(), dto.getOldPassword(), dto.getNewPassword());
+        return Result.success("Update Success");
+    }
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\controller\ChatController.java`:
+
+```java
+package com.raincheck.finalyearproj.controller;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.raincheck.finalyearproj.common.Result;
+import com.raincheck.finalyearproj.common.UserContext;
+import com.raincheck.finalyearproj.model.entity.ChatMessage;
+import com.raincheck.finalyearproj.service.ChatMessageService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/chat")
+public class ChatController {
+
+    @Autowired
+    private ChatMessageService chatMessageService;
+
+    // 获取我与某个人的全部聊天记录
+    @GetMapping("/history/{contactId}")
+    public Result<List<ChatMessage>> getChatHistory(@PathVariable Integer contactId) {
+        Integer myId = UserContext.getUserId();
+
+        // 查询条件：(sender = me AND receiver = contact) OR (sender = contact AND receiver = me)
+        List<ChatMessage> history = chatMessageService.list(new LambdaQueryWrapper<ChatMessage>()
+                .and(wrapper -> wrapper
+                        .eq(ChatMessage::getSenderId, myId)
+                        .eq(ChatMessage::getReceiverId, contactId)
+                )
+                .or(wrapper -> wrapper
+                        .eq(ChatMessage::getSenderId, contactId)
+                        .eq(ChatMessage::getReceiverId, myId)
+                )
+                .orderByAsc(ChatMessage::getCreatedAt) // 按时间正序，旧的在上面
+        );
+
+        return Result.success(history);
+    }
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\controller\StudentProjectController.java`:
+
+```java
+package com.raincheck.finalyearproj.controller;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.raincheck.finalyearproj.common.Result;
+import com.raincheck.finalyearproj.common.UserContext;
+import com.raincheck.finalyearproj.model.entity.Project;
+import com.raincheck.finalyearproj.model.entity.UploadedFile;
+import com.raincheck.finalyearproj.model.entity.User;
+import com.raincheck.finalyearproj.model.entity.VersionLog;
+import com.raincheck.finalyearproj.model.vo.ProjectVO;
+import com.raincheck.finalyearproj.service.ProjectService;
+import com.raincheck.finalyearproj.service.UserService;
+import com.raincheck.finalyearproj.service.VersionLogService;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
+@RestController
+@RequestMapping("/api/student/projects")
+public class StudentProjectController {
+
+    @Autowired
+    private ProjectService projectService;
+
+    @Autowired
+    private VersionLogService versionLogService; // 注入日志服务
+
+    @Autowired
+    private UserService userService;
+
+    // A. 获取“我的项目”详情 (已有的)
+    @GetMapping("/my")
+    public Result<ProjectVO> getMyProject() {
+        Integer studentId = UserContext.getUserId();
+
+        // 使用你自定义的 Service 方法进行联表查询
+        // 如果还没写联表，可以先用这种简单方式凑效：
+        Project project = projectService.getProjectVoById(studentId);
+
+        if (project == null) return Result.error(404, "No project found");
+
+        ProjectVO vo = new ProjectVO();
+        BeanUtils.copyProperties(project, vo);
+
+        // 假设你有 StaffService，根据 staffId 查名字
+        if (project.getSupervisorId() != null) {
+            User staff = userService.getById(project.getSupervisorId());
+            vo.setSupervisorName(staff != null ? staff.getName() : "Not Assigned");
+        }
+
+        return Result.success(vo);
+    }
+
+    // B. 学生提交作业 (已有的)
+    @PostMapping("/{projectId}/upload")
+    public Result<UploadedFile> upload(@PathVariable Integer projectId,
+                                       @RequestPart MultipartFile file,
+                                       @RequestParam(required = false) String description) {
+        Project project = projectService.getById(projectId);
+
+        // 修复点：确保类型一致。建议统一使用 Long 或在比较时转为 String
+        if (project == null || !String.valueOf(project.getStudentId()).equals(String.valueOf(UserContext.getUserId()))) {
+            return Result.error(403, "Access Denied. Project ID: " + projectId + " does not belong to user: " + UserContext.getUserId());
+        }
+
+        // 如果这里报错，说明 uploadSubmission 内部逻辑有问题
+        return Result.success(projectService.uploadSubmission(projectId, file, description));
+    }
+
+    /**
+     * C. 满足需求 3.3 (2): 查看自己的版本记录/进展日志
+     * 学生需要看自己什么时候交了什么，以及对应的 GitHub 链接
+     */
+    @GetMapping("/{projectId}/progress")
+    public Result<List<VersionLog>> getMyProgress(@PathVariable Integer projectId) {
+        // 安全校验：防止学生 A 查学生 B 的进度
+        Project project = projectService.getById(projectId);
+        if (project == null || !project.getStudentId().equals(UserContext.getUserId())) {
+            return Result.error(403, "Access Denied.");
+        }
+
+        // 查询该项目下所有的日志，按时间倒序排列
+        List<VersionLog> logs = versionLogService.list(new LambdaQueryWrapper<VersionLog>()
+                .eq(VersionLog::getProjectId, projectId)
+                .orderByDesc(VersionLog::getCreatedAt));
+
+        return Result.success(logs);
+    }
+
+    // D. 学生创建项目 (已有的)
+    @PostMapping("/create")
+    public Result<String> createProject(@RequestBody Project project) {
+        // 修正：强制设置 studentId 为当前登录者，防止前端传参欺骗
+        project.setStudentId(UserContext.getUserId());
+        projectService.createProject(project);
+        return Result.success("Project application submitted.");
+    }
+
+    @GetMapping("/supervisors")
+    public Result<List<User>> getAllSupervisors() {
+        // 逻辑：查询 role 为 STAFF 的所有用户
+        List<User> list = userService.list(new LambdaQueryWrapper<User>()
+                .eq(User::getRole, "STAFF")
+                .select(User::getUserId, User::getName, User::getEmail)); // 只查必要的列
+        return Result.success(list);
+    }
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\controller\SupervisorProjectController.java`:
+
+```java
+package com.raincheck.finalyearproj.controller;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.raincheck.finalyearproj.common.Result;
+import com.raincheck.finalyearproj.common.UserContext;
+import com.raincheck.finalyearproj.model.entity.Project;
+import com.raincheck.finalyearproj.model.entity.VersionLog;
+import com.raincheck.finalyearproj.model.vo.ProjectVO;
+import com.raincheck.finalyearproj.service.ProjectService;
+import com.raincheck.finalyearproj.service.VersionLogService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/supervisor/projects")
+public class SupervisorProjectController {
+
+    @Autowired
+    private ProjectService projectService;
+
+    @Autowired
+    private VersionLogService versionLogService;
+
+    // 获取导师负责的所有学生项目列表
+    @GetMapping("/my-students")
+    public Result<List<ProjectVO>> getMyStudents() {
+        Integer supervisorId = UserContext.getUserId();
+
+        // 1. 先查出该导师下的所有原始项目记录
+        List<Project> projects = projectService.lambdaQuery()
+                .eq(Project::getSupervisorId, supervisorId)
+                .list();
+
+        // 2. 调用我们刚才写的转换逻辑，填充 Email 和 Name
+        List<ProjectVO> voList = projectService.convertToVoList(projects);
+
+        return Result.success(voList);
+    }
+
+    /**
+     * 2. 查看单个学生的项目进展记录 (Individual Student Progress View)
+     * 逻辑：根据项目ID获取该项目的所有版本日志，按时间倒序排列
+     */
+    @GetMapping("/{projectId}/progress")
+    public Result<List<VersionLog>> getStudentProgress(@PathVariable Integer projectId) {
+        // 安全校验：确保该项目确实属于当前登录的导师
+        Project project = projectService.getById(projectId);
+        if (project == null || !project.getSupervisorId().equals(UserContext.getUserId())) {
+            return Result.error(403, "Access denied.");
+        }
+
+        // 获取该项目的所有日志，按时间从新到旧排序
+        List<VersionLog> logs = versionLogService.list(new LambdaQueryWrapper<VersionLog>()
+                .eq(VersionLog::getProjectId, projectId)
+                .orderByDesc(VersionLog::getCreatedAt));
+
+        return Result.success(logs);
+    }
+}
+
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\handler\GlobalExceptionHandler.java`:
+
+```java
+package com.raincheck.finalyearproj.handler;
+
+import com.raincheck.finalyearproj.common.Result;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+@Slf4j
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    // 捕获所有业务异常
+    @ExceptionHandler(RuntimeException.class)
+    public Result<String> handleRuntimeException(RuntimeException e) {
+        log.error(e.getMessage()); // 控制台打印方便调试
+        return Result.error(500, e.getMessage());
+    }
+
+    // 捕获兜底异常
+    @ExceptionHandler(Exception.class)
+    public Result<String> handleException(Exception e) {
+        return Result.error(500, "Internal Server Error: " + e.getMessage());
+    }
+}
+
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\interceptor\JwtInterceptor.java`:
+
+```java
+package com.raincheck.finalyearproj.interceptor;
+
+import com.raincheck.finalyearproj.common.UserContext;
+import com.raincheck.finalyearproj.utils.JwtUtils;
+import io.jsonwebtoken.Claims;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.HandlerInterceptor;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+@Slf4j
+@Component
+public class JwtInterceptor implements HandlerInterceptor {
+
+    @Autowired
+    private JwtUtils jwtUtils;
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws IOException {
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
+
+        String token = request.getHeader("Authorization");
+
+        if (token != null && token.startsWith("Bearer ")) {
+            token = token.substring(7);
+
+            // 解析即验证
+            Claims claims = jwtUtils.getClaimsByToken(token);
+
+            if (claims != null) {
+                // 验证通过，封装用户信息
+                UserContext.UserDTO userDTO = UserContext.UserDTO.builder()
+                        .userId((Integer) claims.get("userId"))
+                        .email(claims.getSubject())
+                        .role((String) claims.get("role"))
+                        .build();
+
+                UserContext.setUser(userDTO);
+                return true;
+            }
+        }
+
+        // 验证失败：Token 缺失、过期、签名错误都会走到这里
+        response.setContentType("application/json;charset=UTF-8");
+        response.setStatus(401);
+        response.getWriter().write("{\"code\": 401, \"msg\": \"Unauthorized: Invalid or expired token\"}");
+        return false;
+    }
+
+    @Override
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
+        // 关键：请求结束后必须清理，因为 Tomcat 线程池会复用线程
+        UserContext.removeUser();
+    }
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\mapper\ChatMessageMapper.java`:
+
+```java
+package com.raincheck.finalyearproj.mapper;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.raincheck.finalyearproj.model.entity.ChatMessage;
+import org.apache.ibatis.annotations.Mapper;
+
+@Mapper
+public interface ChatMessageMapper extends BaseMapper<ChatMessage> {}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\mapper\ProjectMapper.java`:
+
+```java
+package com.raincheck.finalyearproj.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.raincheck.finalyearproj.model.entity.Project;
+import org.apache.ibatis.annotations.Mapper;
+
+@Mapper
+public interface ProjectMapper extends BaseMapper<Project> {}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\mapper\UploadedFileMapper.java`:
+
+```java
+package com.raincheck.finalyearproj.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.raincheck.finalyearproj.model.entity.UploadedFile;
+import org.apache.ibatis.annotations.Mapper;
+
+@Mapper
+public interface UploadedFileMapper extends BaseMapper<UploadedFile> {}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\mapper\UserMapper.java`:
+
+```java
+package com.raincheck.finalyearproj.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.raincheck.finalyearproj.model.entity.User;
+import org.apache.ibatis.annotations.Mapper;
+
+@Mapper
+public interface UserMapper extends BaseMapper<User> {}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\mapper\VersionLogMapper.java`:
+
+```java
+package com.raincheck.finalyearproj.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.raincheck.finalyearproj.model.entity.VersionLog;
+import org.apache.ibatis.annotations.Mapper;
+
+@Mapper
+public interface VersionLogMapper extends BaseMapper<VersionLog> {}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\model\dto\LoginDataDTO.java`:
+
+```java
+package com.raincheck.finalyearproj.model.dto;
+
+import lombok.Data;
+
+@Data
+public class LoginDataDTO {
+    private String email;
+    private String password;
+}
+
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\model\dto\PasswordUpdateDTO.java`:
+
+```java
+package com.raincheck.finalyearproj.model.dto;
+
+import lombok.Data;
+
+@Data
+public class PasswordUpdateDTO {
+    private String oldPassword;
+    private String newPassword;
+}
+
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\model\entity\ChatMessage.java`:
+
+```java
+package com.raincheck.finalyearproj.model.entity;
+
+import com.baomidou.mybatisplus.annotation.*;
+import lombok.Data;
+import java.time.LocalDateTime;
+
+@Data
+@TableName("chat_messages")
+public class ChatMessage {
+    @TableId(type = IdType.AUTO)
+    private Integer messageId;
+    private Integer senderId;
+    private Integer receiverId;
+    private String content;
+    private Boolean isRead;
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createdAt;
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\model\entity\Project.java`:
+
+```java
+package com.raincheck.finalyearproj.model.entity;
+
+import com.baomidou.mybatisplus.annotation.*;
+import lombok.Data;
+import java.time.LocalDateTime;
+
+@Data
+@TableName("projects")
+public class Project {
+    @TableId(type = IdType.AUTO)
+    private Integer projectId;
+    private Integer studentId;   // 对应 Users.user_id
+    private Integer supervisorId; // 对应 Users.user_id
+    private String projectTitle;
+    private String description;
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createdAt;
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private LocalDateTime updatedAt;
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\model\entity\UploadedFile.java`:
+
+```java
+package com.raincheck.finalyearproj.model.entity;
+
+import com.baomidou.mybatisplus.annotation.*;
+import lombok.Data;
+import java.time.LocalDateTime;
+
+@Data
+@TableName("uploaded_files")
+public class UploadedFile {
+    @TableId(type = IdType.AUTO)
+    private Integer fileId;
+    private Integer projectId;
+    private String fileName;
+    private String fileUrl;
+    private Float sizeMb;
+    private LocalDateTime uploadedAt;
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\model\entity\User.java`:
+
+```java
+package com.raincheck.finalyearproj.model.entity;
+
+import com.baomidou.mybatisplus.annotation.*;
+import lombok.Data;
+import java.time.LocalDateTime;
+
+@Data
+@TableName("users")
+public class User {
+    @TableId(type = IdType.AUTO)
+    private Integer userId;
+    private String role; // STUDENT 或 STAFF
+    private String name;
+    private String email;
+    private String passwordHash;
+
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createdAt;
+    private LocalDateTime lastLogin;
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\model\entity\VersionLog.java`:
+
+```java
+package com.raincheck.finalyearproj.model.entity;
+
+import com.baomidou.mybatisplus.annotation.*;
+import lombok.Data;
+import java.time.LocalDateTime;
+
+@Data
+@TableName("version_logs")
+public class VersionLog {
+    @TableId(type = IdType.AUTO)
+    private Integer logId;
+    private Integer projectId;
+    private String logType; // COMMIT, UPLOAD, NOTE
+    private String commitLink;
+    private String description;
+    private LocalDateTime createdAt;
+    private LocalDateTime timestamp;
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\model\vo\ProjectVO.java`:
+
+```java
+package com.raincheck.finalyearproj.model.vo;
+
+import com.raincheck.finalyearproj.model.entity.Project;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@EqualsAndHashCode(callSuper = true)
+@Data
+public class ProjectVO extends Project {
+    /**
+     * 导师姓名
+     */
+    private String supervisorName;
+
+    /**
+     * 导师邮箱（用于 Teams 通讯）
+     */
+    private String supervisorEmail;
+
+    /**
+     * 学生姓名
+     */
+    private String studentName;
+
+    /**
+     * 学生邮箱（用于 Teams 通讯）
+     */
+    private String studentEmail;
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\service\ChatMessageService.java`:
+
+```java
+package com.raincheck.finalyearproj.service;
+import com.baomidou.mybatisplus.extension.service.IService;
+import com.raincheck.finalyearproj.model.entity.ChatMessage;
+
+public interface ChatMessageService extends IService<ChatMessage> {
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\service\ProjectService.java`:
+
+```java
+package com.raincheck.finalyearproj.service;
+
+import com.baomidou.mybatisplus.extension.service.IService;
+import com.raincheck.finalyearproj.model.entity.Project;
+import com.raincheck.finalyearproj.model.entity.UploadedFile;
+import com.raincheck.finalyearproj.model.vo.ProjectVO;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
+
+public interface ProjectService extends IService<Project> {
+    @Transactional(rollbackFor = Exception.class)
+    UploadedFile uploadSubmission(Integer projectId, MultipartFile file, String description);
+
+    void createProject(Project project);
+
+    Project getProjectVoById(Integer studentId);
+
+    List<ProjectVO> convertToVoList(List<Project> projects);
+}
+
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\service\UserService.java`:
+
+```java
+package com.raincheck.finalyearproj.service;
+
+import com.baomidou.mybatisplus.extension.service.IService;
+import com.raincheck.finalyearproj.model.entity.User;
+
+public interface UserService extends IService<User> {
+    String register(User user);
+    String login(String email, String password);
+    boolean updatePassword(String email, String oldPassword, String newPassword);
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\service\VersionLogService.java`:
+
+```java
+package com.raincheck.finalyearproj.service;
+
+import com.baomidou.mybatisplus.extension.service.IService;
+import com.raincheck.finalyearproj.model.entity.VersionLog;
+
+public interface VersionLogService extends IService<VersionLog> {
+    // 这里如果以后有复杂的统计逻辑（比如统计学生本周提交次数），可以定义在这里
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\service\impl\ChatMessageServiceImpl.java`:
+
+```java
+package com.raincheck.finalyearproj.service.impl;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.raincheck.finalyearproj.mapper.ChatMessageMapper;
+import com.raincheck.finalyearproj.model.entity.ChatMessage;
+import com.raincheck.finalyearproj.service.ChatMessageService;
+import org.springframework.stereotype.Service;
+
+@Service
+public class ChatMessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatMessage> implements ChatMessageService {
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\service\impl\ProjectServiceImpl.java`:
+
+```java
+package com.raincheck.finalyearproj.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.raincheck.finalyearproj.model.entity.*;
+import com.raincheck.finalyearproj.mapper.*;
+import com.raincheck.finalyearproj.model.vo.ProjectVO;
+import com.raincheck.finalyearproj.service.ProjectService;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+public class ProjectServiceImpl extends ServiceImpl<ProjectMapper, Project> implements ProjectService {
+
+    @Autowired
+    private UploadedFileMapper fileMapper;
+    @Autowired
+    private VersionLogMapper logMapper;
+    @Autowired
+    private RestTemplate restTemplate;
+    @Autowired
+    private UserMapper userMapper;
+
+    @Value("${github.token}")
+    private String token;
+    @Value("${github.owner}")
+    private String owner;
+    @Value("${github.repo}")
+    private String repo;
+
+    private final String GITHUB_API_URL = "https://api.github.com/repos/%s/%s/contents/%s";
+
+    /**
+     * 1. 创建项目 (学生端)
+     * 逻辑：一个学生只能拥有一个处于激活状态的项目。
+     */
+    @Override
+    public void createProject(Project project) {
+        // 校验是否已有项目
+        Long count = this.count(new LambdaQueryWrapper<Project>()
+                .eq(Project::getStudentId, project.getStudentId()));
+        if (count > 0) {
+            throw new RuntimeException("Error: You already have an active project.");
+        }
+
+        project.setCreatedAt(LocalDateTime.now());
+        project.setUpdatedAt(LocalDateTime.now());
+        this.save(project);
+    }
+
+    /**
+     * 2. 上传提交物至 GitHub (核心业务)
+     * 逻辑：文件推送至 GitHub -> 数据库记录元数据 -> 自动生成版本日志
+     */
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public UploadedFile uploadSubmission(Integer projectId, MultipartFile file, String description) {
+        try {
+            // A. GitHub 存储逻辑
+            String originalFilename = file.getOriginalFilename();
+            String path = "submissions/proj_" + projectId + "/" + System.currentTimeMillis() + "_" + originalFilename;
+            String base64Content = Base64.getEncoder().encodeToString(file.getBytes());
+
+            String url = String.format(GITHUB_API_URL, owner, repo, path);
+
+            Map<String, Object> body = new HashMap<>();
+            body.put("message", "Student upload: " + originalFilename);
+            body.put("content", base64Content);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + token);
+            headers.set("Accept", "application/vnd.github+json");
+
+            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.PUT, new HttpEntity<>(body, headers), Map.class);
+
+            if (response.getStatusCode() != HttpStatus.CREATED) {
+                throw new RuntimeException("GitHub upload failed with status: " + response.getStatusCode());
+            }
+
+            // B. 数据库记录：文件表
+            Map contentMap = (Map) response.getBody().get("content");
+            String githubUrl = (String) contentMap.get("html_url");
+
+            UploadedFile fileRecord = new UploadedFile();
+            fileRecord.setProjectId(projectId);
+            fileRecord.setFileName(originalFilename);
+            fileRecord.setFileUrl(githubUrl);
+            fileRecord.setSizeMb((float) file.getSize() / (1024 * 1024));
+            fileRecord.setUploadedAt(LocalDateTime.now());
+            fileMapper.insert(fileRecord);
+
+            // C. 数据库记录：自动生成的版本日志 (Version Log)
+            VersionLog logEntry = new VersionLog();
+            logEntry.setProjectId(projectId);
+            logEntry.setLogType("UPLOAD");
+            logEntry.setCommitLink(githubUrl);
+            logEntry.setDescription(description);
+            logEntry.setCreatedAt(LocalDateTime.now());
+            logEntry.setTimestamp(LocalDateTime.now());
+            logMapper.insert(logEntry);
+
+            return fileRecord;
+
+        } catch (Exception e) {
+            // 触发 @Transactional 回滚，保证 DB 不会产生孤立记录
+            throw new RuntimeException("Upload Process Failed: " + e.getMessage());
+        }
+    }
+
+    public ProjectVO getProjectVoById(Integer studentId) {
+        Project project = this.getOne(new LambdaQueryWrapper<Project>()
+                .eq(Project::getStudentId, studentId));;
+        if (project == null) return null;
+
+        ProjectVO vo = new ProjectVO();
+        BeanUtils.copyProperties(project, vo);
+
+        if (project.getSupervisorId() != null) {
+            User supervisor = userMapper.selectById(project.getSupervisorId());
+            if (supervisor != null) {
+                vo.setSupervisorName(supervisor.getName());
+                vo.setSupervisorEmail(supervisor.getEmail()); // 注入导师邮箱
+            }
+        }
+
+        if (project.getStudentId() != null) {
+            User student = userMapper.selectById(project.getStudentId());
+            if (student != null) {
+                vo.setStudentName(student.getName());
+                vo.setStudentEmail(student.getEmail()); // 注入学生邮箱
+            }
+        }
+
+        return vo;
+    }
+
+    public List<ProjectVO> convertToVoList(List<Project> projects) {
+        return projects.stream().map(project -> {
+            ProjectVO vo = new ProjectVO();
+            BeanUtils.copyProperties(project, vo);
+
+            User supervisor = userMapper.selectById(project.getSupervisorId());
+            if (supervisor != null) {
+                vo.setSupervisorName(supervisor.getName());
+                vo.setSupervisorEmail(supervisor.getEmail());
+            }
+
+            User student = userMapper.selectById(project.getStudentId());
+            if (student != null) {
+                vo.setStudentName(student.getName());
+                vo.setStudentEmail(student.getEmail());
+            }
+
+            return vo;
+        }).collect(Collectors.toList());
+    }
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\service\impl\UserServiceImpl.java`:
+
+```java
+package com.raincheck.finalyearproj.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.raincheck.finalyearproj.model.entity.User;
+import com.raincheck.finalyearproj.mapper.UserMapper;
+import com.raincheck.finalyearproj.service.UserService;
+import com.raincheck.finalyearproj.utils.JwtUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+
+@Service
+public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
+
+    @Autowired
+    private BCryptPasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JwtUtils jwtUtils;
+
+    @Override
+    public String register(User user) {
+        // 1. 检查邮箱是否已被注册
+        User existingUser = this.getOne(new LambdaQueryWrapper<User>()
+                .eq(User::getEmail, user.getEmail()));
+
+        if (existingUser != null) {
+            throw new RuntimeException("Email already registered!");
+        }
+
+        // 2. 加密密码
+        user.setPasswordHash(passwordEncoder.encode(user.getPasswordHash()));
+        user.setCreatedAt(LocalDateTime.now());
+
+        // 3. 保存到数据库
+        boolean saved = this.save(user);
+        return saved ? "Register success" : "Register failed";
+    }
+
+    @Override
+    public String login(String email, String password) {
+        User user = this.getOne(new LambdaQueryWrapper<User>().eq(User::getEmail, email));
+
+        if (user != null && passwordEncoder.matches(password, user.getPasswordHash())) {
+            // 更新最后登录时间
+            user.setLastLogin(LocalDateTime.now());
+            this.updateById(user);
+
+            return jwtUtils.createToken(user.getUserId(), user.getEmail(), user.getRole());
+        }
+        throw new RuntimeException("Login failed");
+    }
+
+    @Override
+    public boolean updatePassword(String email, String oldPassword, String newPassword) {
+        User user = this.getOne(new LambdaQueryWrapper<User>().eq(User::getEmail, email));
+        if (user == null) throw new RuntimeException("User not found");
+
+        // 1. 验证旧密码
+        if (!passwordEncoder.matches(oldPassword, user.getPasswordHash())) {
+            throw new RuntimeException("Old password incorrect");
+        }
+
+        // 2. 加密新密码并保存
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        return this.updateById(user);
+    }
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\service\impl\VersionLogServiceImpl.java`:
+
+```java
+package com.raincheck.finalyearproj.service.impl;
+
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.raincheck.finalyearproj.model.entity.VersionLog;
+import com.raincheck.finalyearproj.mapper.VersionLogMapper;
+import com.raincheck.finalyearproj.service.VersionLogService;
+import org.springframework.stereotype.Service;
+
+@Service
+public class VersionLogServiceImpl extends ServiceImpl<VersionLogMapper, VersionLog> implements VersionLogService {
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\utils\JwtUtils.java`:
+
+```java
+package com.raincheck.finalyearproj.utils;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
+@Slf4j
+@Component
+public class JwtUtils {
+
+    @Value("${jwt.secret:MySecretKey123}") // 建议在yml中定义
+    private String secret;
+
+    @Value("${jwt.expiration:86400000}") // 默认24小时
+    private long expire;
+
+    // 生成 Token
+    public String createToken(Integer userId, String email, String role) {
+        Date now = new Date();
+        Date expiration = new Date(now.getTime() + expire * 1000);
+
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
+        claims.put("role", role);
+
+        return Jwts.builder()
+                .setHeaderParam("typ", "JWT")
+                .setClaims(claims)
+                .setSubject(email)
+                .setIssuedAt(now)
+                .setExpiration(expiration)
+                .signWith(SignatureAlgorithm.HS256, secret)
+                .compact();
+    }
+
+    /**
+     * 校验并解析 Token
+     */
+    public boolean validateToken(String token) {
+        try {
+            Jwts.parser().setSigningKey(secret).parseClaimsJws(token);
+            return true;
+        } catch (Exception e) {
+            // 这里会捕获：Token过期、签名错误、格式错误等异常
+            return false;
+        }
+    }
+
+    // JwtUtils.java
+    public Claims getClaimsByToken(String token) {
+        try {
+            return Jwts.parser()
+                    .setSigningKey(secret)
+                    .parseClaimsJws(token)
+                    .getBody();
+        } catch (Exception e) {
+            // 签名不对、过期、格式不对都会走到这里
+            log.error("JWT validation failed: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * 获取完整的 Claims
+     */
+    public Claims getClaims(String token) {
+        return Jwts.parser()
+                .setSigningKey(secret)
+                .parseClaimsJws(token)
+                .getBody();
+    }
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\websocket\ChatHandshakeInterceptor.java`:
+
+```java
+package com.raincheck.finalyearproj.websocket;
+
+import com.raincheck.finalyearproj.utils.JwtUtils;
+import io.jsonwebtoken.Claims;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.server.ServerHttpRequest;
+import org.springframework.http.server.ServerHttpResponse;
+import org.springframework.http.server.ServletServerHttpRequest;
+import org.springframework.stereotype.Component;
+import org.springframework.web.socket.WebSocketHandler;
+import org.springframework.web.socket.server.HandshakeInterceptor;
+
+import java.util.Map;
+
+@Slf4j
+@Component
+public class ChatHandshakeInterceptor implements HandshakeInterceptor {
+
+    @Autowired
+    private JwtUtils jwtUtils;
+
+    @Override
+    public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response, WebSocketHandler wsHandler, Map<String, Object> attributes) throws Exception {
+        if (request instanceof ServletServerHttpRequest) {
+            ServletServerHttpRequest req = (ServletServerHttpRequest) request;
+            // 获取 URL 参数中的 token (ws://localhost:8080/ws/chat?token=xxxx)
+            String token = req.getServletRequest().getParameter("token");
+
+            if (token != null) {
+                Claims claims = jwtUtils.getClaimsByToken(token);
+                if (claims != null) {
+                    // 验证成功，将 userId 存入 WebSocket 的 session attributes 中
+                    Integer userId = (Integer) claims.get("userId");
+                    attributes.put("userId", userId);
+                    log.info("WebSocket handshake successful for userId: {}", userId);
+                    return true;
+                }
+            }
+        }
+        log.warn("WebSocket handshake failed: Invalid or missing token");
+        return false;
+    }
+
+    @Override
+    public void afterHandshake(ServerHttpRequest request, ServerHttpResponse response, WebSocketHandler wsHandler, Exception exception) {}
+}
+```
+
+`final-year-proj/src\main\java\com\raincheck\finalyearproj\websocket\ChatWebSocketHandler.java`:
+
+```java
+package com.raincheck.finalyearproj.websocket;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.raincheck.finalyearproj.model.entity.ChatMessage;
+import com.raincheck.finalyearproj.service.ChatMessageService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.web.socket.*;
+import org.springframework.web.socket.handler.TextWebSocketHandler;
+
+import java.time.LocalDateTime;
+import java.util.concurrent.ConcurrentHashMap;
+
+@Slf4j
+@Component
+public class ChatWebSocketHandler extends TextWebSocketHandler {
+
+    @Autowired
+    private ChatMessageService chatMessageService;
+
+    @Autowired
+    private ObjectMapper objectMapper; // Spring 自带的 JSON 处理工具
+
+    // 存储所有在线用户的 WebSocketSession (Key 为 userId)
+    private static final ConcurrentHashMap<Integer, WebSocketSession> SESSIONS = new ConcurrentHashMap<>();
+
+    @Override
+    public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+        Integer userId = (Integer) session.getAttributes().get("userId");
+        SESSIONS.put(userId, session);
+        log.info("User {} connected to chat.", userId);
+    }
+
+    @Override
+    protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
+        Integer senderId = (Integer) session.getAttributes().get("userId");
+        String payload = message.getPayload();
+
+        // 解析前端发来的 JSON，例如：{"receiverId": 104, "content": "老师好！"}
+        JsonNode jsonNode = objectMapper.readTree(payload);
+        Integer receiverId = jsonNode.get("receiverId").asInt();
+        String content = jsonNode.get("content").asText();
+
+        // 1. 保存消息到数据库
+        ChatMessage chatMsg = new ChatMessage();
+        chatMsg.setSenderId(senderId);
+        chatMsg.setReceiverId(receiverId);
+        chatMsg.setContent(content);
+        chatMsg.setCreatedAt(LocalDateTime.now());
+        chatMsg.setIsRead(false);
+        chatMessageService.save(chatMsg);
+
+        // 2. 尝试发给接收者（如果对方在线）
+        WebSocketSession receiverSession = SESSIONS.get(receiverId);
+        if (receiverSession != null && receiverSession.isOpen()) {
+            // 把完整的消息对象转成 JSON 发给对方前端
+            String msgJson = objectMapper.writeValueAsString(chatMsg);
+            receiverSession.sendMessage(new TextMessage(msgJson));
+        }
+
+        // 3. （可选）把消息回传给发送者自己，以确认发送成功
+        session.sendMessage(new TextMessage(objectMapper.writeValueAsString(chatMsg)));
+    }
+
+    @Override
+    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
+        Integer userId = (Integer) session.getAttributes().get("userId");
+        if (userId != null) {
+            SESSIONS.remove(userId);
+            log.info("User {} disconnected from chat.", userId);
+        }
+    }
+}
+```
+
+`final-year-proj/src\test\java\com\raincheck\finalyearproj\FinalYearProjApplicationTests.java`:
+
+```java
+package com.raincheck.finalyearproj;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class FinalYearProjApplicationTests {
+
+    @Test
+    void contextLoads() {
+    }
+
+}
+
+```
+
+`final-year-proj/src\test\java\com\raincheck\finalyearproj\ProjectServiceTest.java`:
+
+```java
+package com.raincheck.finalyearproj;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.raincheck.finalyearproj.mapper.UserMapper;
+import com.raincheck.finalyearproj.model.entity.Project;
+import com.raincheck.finalyearproj.model.entity.UploadedFile;
+import com.raincheck.finalyearproj.common.UserContext;
+import com.raincheck.finalyearproj.model.entity.User;
+import com.raincheck.finalyearproj.service.ProjectService;
+import com.raincheck.finalyearproj.service.UserService;
+import org.junit.jupiter.api.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+@SpringBootTest
+//@Transactional // 测试完成后自动回滚，不污染数据库
+public class ProjectServiceTest {
+
+    @Autowired
+    private ProjectService projectService;
+
+    @Autowired
+    private UserService userService;
+
+    @BeforeEach
+    void setUp() {
+        // 设置上下文
+        UserContext.setUser(UserContext.UserDTO.builder()
+                .userId(1).email("student@school.edu").role("STUDENT").build());
+    }
+
+    @AfterEach
+    void tearDown() {
+        // 清理 ThreadLocal 防止影响其他测试
+        UserContext.removeUser();
+    }
+
+    @Test
+    @DisplayName("测试学生申请课题逻辑")
+    void testCreateProject() {
+        Project existingProj = projectService.getOne(new LambdaQueryWrapper<Project>()
+                .eq(Project::getProjectId, 10));
+
+        if (existingProj == null) {
+            Project project = new Project();
+            project.setStudentId(1);
+            project.setProjectTitle("Testing project");
+            project.setSupervisorId(101); // 假设 101 是导师 ID
+            project.setDescription("Testing project.");
+            projectService.createProject(project);
+        }
+    }
+
+    @Test
+    @DisplayName("测试 GitHub 文件上传及日志生成")
+    void testUploadToGithub() {
+        Project project = projectService.getOne(new LambdaQueryWrapper<Project>()
+                .eq(Project::getProjectTitle, "Testing project"));
+
+        // 2. 模拟前端上传的文件
+        MockMultipartFile mockFile = new MockMultipartFile(
+                "file",
+                "test_report.pdf",
+                "application/pdf",
+                "Hello GitHub API".getBytes(StandardCharsets.UTF_8)
+        );
+
+        // 3. 执行上传（会触发 GitHub REST API 调用）
+        UploadedFile result = projectService.uploadSubmission(
+                project.getProjectId(),
+                mockFile,
+                "This is a prototype."
+        );
+
+        // 4. 断言结果
+        assertNotNull(result);
+        assertTrue(result.getFileUrl().contains("github.com"), "返回的 URL 应包含 GitHub 域名");
+        System.out.println("GitHub 存储链接: " + result.getFileUrl());
+    }
+
+    @Test
+    @DisplayName("测试重复申请课题应抛出异常")
+    void testDuplicateProject() {
+        Project p1 = new Project();
+        p1.setStudentId(1);
+        p1.setProjectTitle("Testing project1");
+        projectService.createProject(p1);
+
+        Project p2 = new Project();
+        p2.setStudentId(1);
+        p2.setProjectTitle("Testing project2");
+
+        // 预期会抛出异常
+        assertThrows(RuntimeException.class, () -> projectService.createProject(p2));
+    }
+}
+```
+
+`final-year-proj/src\test\java\com\raincheck\finalyearproj\Security\AuthTest.java`:
+
+```java
+package com.raincheck.finalyearproj.Security;
+
+import com.raincheck.finalyearproj.model.entity.User;
+import com.raincheck.finalyearproj.service.UserService;
+import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+@Slf4j
+@SpringBootTest
+class AuthTest {
+
+    @Autowired
+    private UserService userService;
+
+    /**
+     * Register and login
+     */
+    @Test
+    void testAuthFlow() {
+        // 1. 模拟注册
+        User user = new User();
+        user.setEmail("mock_viva_stu3@qmul.ac.uk");
+        user.setPasswordHash("123456");
+        user.setName("Mock viva supervisor");
+        user.setRole("STUDENT");
+
+        try {
+            String regMsg = userService.register(user);
+            log.info("Register Result: {}", regMsg);
+        }
+        catch (Exception e){
+            log.error(e.getMessage());
+        }
+
+        // 2. 模拟登录
+//        String token = userService.login("jp2022213090@qmul.ac.uk", "123456");
+//        log.info("Generated JWT: {}", token);
+
+//        assertNotNull(token);
+    }
+
+    /**
+     * Password update
+     */
+    @Test
+    void testPasswordUpdate() {
+        try{
+            userService.updatePassword("test_student@bupt.edu.cn", "123456", "123456");
+        } catch (Exception e){
+            log.error(e.getMessage());
+        }
+        log.info("Password changed.");
+    }
+
+    /**
+     * Invalid password, non-existent login and duplicated registry
+     */
+    @Test
+    void testAuthEdgeCases() {
+        try {
+            String token = userService.login("test_student@bupt.edu.cn", "123456");
+            log.info(token);
+        } catch (Exception e){
+            log.error(e.getMessage());
+        }
+
+        try {
+            userService.login("non_existent@bupt.edu.cn", "123456");
+        } catch (Exception e){
+            log.error(e.getMessage());
+        }
+
+        User duplicateUser = new User();
+        duplicateUser.setEmail("test_student@bupt.edu.cn"); // 使用已注册的邮箱
+        duplicateUser.setPasswordHash("any_pass");
+
+        try {
+            userService.register(duplicateUser);
+        } catch (Exception e){
+            log.error(e.getMessage());
+        }
+    }
+}
+
+```
